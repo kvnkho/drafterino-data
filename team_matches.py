@@ -3,6 +3,7 @@ import json
 import pymongo # MongoDB connection
 import time
 
+from dbconn import connectToDatabase
 from pymongo import MongoClient
 
 # Extracts draft data for each team and posts it to MongoDB
@@ -95,30 +96,6 @@ def getMatchDraft(match_id):
     draft = {'match_id': match_id, 'draft_timings': draft_timings, 'start_time': start_time}
     return(draft)
 
-def connectToDatabase():
-    # Database currently lives in a Heroku App
-    # Returns the database connection
-
-    database_name = 'heroku_p0ncspzj'
-
-    connection_params = {
-    'user': 'kvnkho',
-    'password': 'drafter123',
-    'host': 'ds231207.mlab.com',
-    'port': 31207,
-    'namespace': database_name,
-    }
-
-    connection = MongoClient(
-        'mongodb://{user}:{password}@{host}:'
-        '{port}/{namespace}'.format(**connection_params)
-    )
-
-    dbconn = connection[database_name]
-
-    return dbconn
-
-
 def getDatabaseMatches(team_name, dbconn):
     # Returns list of existing matches in database for a given team
     db = dbconn['match_history']
@@ -137,7 +114,7 @@ def getDatabaseMatches(team_name, dbconn):
 def postToDatabase(team_name, drafts, dbconn):
     # Create collection if none exist. Collection is created lazily
     # It only exists when data is added to it
-    if dbconn.collection_names() == []:
+    if 'match_history' not in dbconn.list_collection_names():
         db = dbconn['match_history']
         db.create_index("team_name")
     else:
@@ -166,7 +143,8 @@ dbconn = connectToDatabase()
 team_name = 'Evil Geniuses'
 team_id = getTeamIds([team_name])
 team_id = team_id[0]
-print("Team ID is :" + str(team_id))
+print("Team ID is: " + str(team_id))
+print("Team name is: " + team_name)
 
 matches = getTeamMatches(team_id, team_name, dbconn)
 print("Got team matches")
@@ -177,8 +155,6 @@ for match in matches:
     time.sleep(1) # Prevent API Throttle of 60 requests/min
     draft = getMatchDraft(match)
     drafts.append(draft)
-
-
 
 print("Posting to database")
 postToDatabase(team_name, drafts, dbconn)
