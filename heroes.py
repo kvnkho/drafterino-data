@@ -3,20 +3,19 @@
 
 import requests
 import json
-import pymongo # MongoDB connection
 
-from dbconn import connectToDatabase
 from pymongo import MongoClient
 
+# User-Defined modules
+from dbconn import connectToDatabase
 
-def getHeroList():
-    # Just calls the API endpoint for 
-    
-    heroes = requests.get("https://api.opendota.com/api/heroes").json()
-            
+
+def getOpenDotaHeroes():
+    # Just calls the API endpoint for heroes
+    heroes = requests.get("https://api.opendota.com/api/heroes").json()     
     return(heroes)
 
-def postToDatabase(heroes, dbconn):
+def postHeroesToDatabase(heroes, dbconn):
     # Create collection if none exist. Collection is created lazily
     # It only exists when data is added to it
     if 'heroes' not in dbconn.list_collection_names():
@@ -27,14 +26,20 @@ def postToDatabase(heroes, dbconn):
 
     # Perform bulk insert onn heroes to database
     db.insert_many(heroes)
-
     return()
+
+def getHeroes(dbconn):
+    # Retrieves the hero dump from the database
+
+    db = dbconn['heroes']
+    return([hero for hero in db.find()])
+
 
 if __name__ == "__main__":
 
-	heroes = getHeroList()
+	heroes = getOpenDotaHeroes()
 	dbconn = connectToDatabase()
 	print("Connected to database")
 
-	postToDatabase(heroes, dbconn)
+	postHeroesToDatabase(heroes, dbconn)
 	print("Posted heroes to database")
