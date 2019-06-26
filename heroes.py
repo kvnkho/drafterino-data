@@ -18,11 +18,9 @@ def getOpenDotaHeroes():
 def postHeroesToDatabase(heroes, dbconn):
     # Create collection if none exist. Collection is created lazily
     # It only exists when data is added to it
-    if 'heroes' not in dbconn.list_collection_names():
-        db = dbconn['heroes']
-        db.create_index("id")
-    else:
-        db = dbconn['heroes']
+    db = dbconn['heroes']
+    db.delete_many({})
+    db.create_index("id")
 
     # Perform bulk insert onn heroes to database
     db.insert_many(heroes)
