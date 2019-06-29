@@ -49,10 +49,10 @@ def queryBuilder(hero_id1, hero_id2, limit):
 def postComboToDatabase(viable_combo, dbconn):
     # Create collection if none exist. Collection is created lazily
     # It only exists when data is added to it
-    db = dbconn['combo_check']
+    collection = dbconn['combo_check']
 
     # Perform bulk insert on heroes to database
-    db.insert_one(viable_combo)
+    collection.insert_one(viable_combo)
     return()
 
 
