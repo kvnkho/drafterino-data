@@ -2,7 +2,8 @@
 # This collects more data and saves API requests while doing so
 
 import requests
-import pandas
+import pandas as pd
+import time
 
 from datetime import datetime
 from dbconn import connectToDatabase
@@ -11,7 +12,9 @@ from heroes import getHeroes
 def createURL(hero):
 	# Creates and returns the URL to scrape for a hero from Dotabuff
 	base_url = 'https://www.dotabuff.com/heroes/'
+	hero = hero.replace('\'','')
 	url = base_url + hero.lower().replace(' ','-') + '/counters?date=week'
+
 	return url
 
 def getDotabuffRaw(url):
@@ -21,11 +24,14 @@ def getDotabuffRaw(url):
 
 	return page
 
-def parseDotabuffRaw(page)
+def parseDotabuffRaw(page):
 	# Converts HTML into Pandas Dataframe
 	# The dataframe we want is the 3rd on the page
 	df = pd.read_html(page.text)
 	df = df[3]
+	df.drop(['Hero'], axis = 1, inplace = True)
+	df.columns = ['Hero', 'Disadvantage', 'Win Rate', 'Matches Played']
+
 	return df
 
 def checkUpdateTime(dbconn, hero_id):
@@ -33,10 +39,12 @@ def checkUpdateTime(dbconn, hero_id):
 	# If no entry, returns True
 	collection = dbconn['countersUpdateTimes']
 	time = collection.find_one({'hero_id': hero_id})
-	time = list(time)
-	if len(time) > 0:
-		difftime = datetime.now - time[0]['time']
+	
+	if time:
+		print('Last Update Time: ' + str(time['time']))
+		difftime = datetime.now() - time['time']
 	else:
+		print('Last Update Time: None')
 		return True
 
 	return (difftime.days > 5)
@@ -47,9 +55,10 @@ def writeUpdateTime(dbconn, hero_id):
 	collection = dbconn['countersUpdateTimes']
 	collection.find_one_and_update({'hero_id': hero_id},{"$set":{'hero_id': hero_id, 'time':datetime.now()}}, upsert= True)
 	print('Update time written')
+
 	return
 
-def generateCounterVector(dbconn, hero, matrix_size, heroes):
+def generateCounterVector(hero, matrix_size, heroes):
 	# Hero is a dictionary containing the id and localized_name
 	hero_id = hero['id']
 	hero_name = hero['localized_name']
@@ -58,22 +67,32 @@ def generateCounterVector(dbconn, hero, matrix_size, heroes):
 
 	if page.status_code == 200:
 		df = parseDotabuffRaw(page)
-		writeUpdateTime(dbconn, hero_name)
 	else:
 		print("Dotabuff page did not load")
 		print('URL was: ' + url)
+
 		return
- 
-	#
-	counter_vector = 
-	for row in df.iterrows():
+ 	
+	hero_ids = [x['id'] for x in heroes]
+	hero_names = [x['localized_name'] for x in heroes]
+
+	counter_vector = [0] * matrix_size
+
+	for index, row in df.iterrows():
+
+		ind = hero_names.index(row['Hero'])
+		counter_vector[hero_ids[ind]] = row['Disadvantage']
+
+	writeUpdateTime(dbconn, hero_id)
+
+	return counter_vector
 
 def createHeroCounters(dbconn, matrix_size):
 	# If table doesn't exist, initialize with matrix
 	collection = dbconn['hero_counters']
-	if collection.count == 0:
-		initlized_data = [[0 for _ in range(matrix_size)] for i in xrange(matrix_size)]
-		collection.insert_one(initlized_data)
+	if collection.count_documents({}) == 0:
+		initlized_data = [[0 for _ in range(matrix_size)] for i in range(matrix_size)]
+		collection.insert_one({'values': initlized_data})
 		print("Initialized hero counter table")
 	else:
 		print("Hero counter table already initialized")
@@ -83,15 +102,16 @@ def createHeroCounters(dbconn, matrix_size):
 def getHeroCounters(dbconn):
 	# Returns matrix of hero counters
 	collection = dbconn['hero_counters']
-	hero_counters = collection.find_one()
+	hero_counters = collection.find_one()['values']
+
 	return hero_counters
 
 def updateHeroCounters(dbconn, hero_id, update_vector):
 	collection = dbconn['hero_counters']
-	hero_counters = collection.find_one()
+	hero_counters = collection.find_one()['values']
 	hero_counters[hero_id] = update_vector
 
-	collection.find_one_and_update({},{"$set":{hero_counters}})
+	collection.find_one_and_update({},{"$set":{'values' : hero_counters}})
 	return
 
 
@@ -101,15 +121,23 @@ def updateHeroCounters(dbconn, hero_id, update_vector):
 dbconn = connectToDatabase()
 heroes = getHeroes(dbconn)
 
-matrix_size = max([hero['id'] for hero in heroes])
+matrix_size = max([hero['id'] for hero in heroes]) + 1
 createHeroCounters(dbconn, matrix_size)
 
 
 for hero in heroes:
 	hero_name = hero['localized_name']
+	print("Processing " + hero_name)
 	hero_id = hero['id']
 
-	if checkUpdateTime(hero_id)
+	if checkUpdateTime(dbconn, hero_id):
+		hero_counters = generateCounterVector(hero, matrix_size, heroes)
+		updateHeroCounters(dbconn, hero_id, hero_counters)
+		time.sleep(10)
+	else:
+		print(hero_name + " has already been scraped recently. Passing.")
+
+	
 
 # For each hero
 # Check update time
