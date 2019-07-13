@@ -86,6 +86,7 @@ def checkSampleCount(dbconn, hero_ids, minimum_samples):
 	# Returns boolean saying if the hero combo needs more samples
 
 	collection = dbconn['hero_combos_matches']
+	hero_ids = sorted(hero_ids)
 	samples = collection.find({'hero_ids': hero_ids})
 	samples = len(samples)
 
@@ -124,6 +125,16 @@ def getHeroCombos(dbconn):
 
 def calculateHeroComboRate(dbconn, hero_ids, hero_winrates):
 	# Returns combo synergy rate to write in db
+	collection = dbconn['hero_combos_matches']
+	hero_ids = sorted(hero_ids)
+	samples = collection.find({'hero_ids': hero_ids})
+
+	wins = sum(x['win'] for x in samples)
+	win_rate = wins/len(samples)
+
+	# Use some statistics to get synergy
+	expected_win_rate = (hero_winrates[0] * hero_winrates[1]) / ((hero_winrates[0] * hero_winrates[1]) + ((1 -hero_winrates[0]) * (1-hero_winrates[1])))
+	combo_rate = (win_rate - expected_win_rate) * 100
 
 	return combo_rate
 
@@ -184,13 +195,19 @@ if __name__ == "__main__":
 
 				while checkSampleCount(dbonn, [hero_id, hero_id2], 1000):
 					# Scrape more matches and insert into DB
-					time.sleep(1)
 
-				writeUpdateTime(dbconn, [hero_id, hero_id2])
+					# PULL MATCHES
+					# Write a controller function
+					{'match ID': XXX, 'radiant': XXX, 'win': XXX}
+					## Write unique matches to combo matches
+
+
+					time.sleep(1)
 
 				# Check if the number of scraped matches is over 
 				hero_combo_rate = calculateHeroComboRate(dbconn, [hero_id, hero_id2], [hero_winrate, hero_winrate2])
 				putHeroCombos(dbconn, [hero_id, hero_id2], hero_combo_rate)
+				writeUpdateTime(dbconn, [hero_id, hero_id2])
 				
 
 			else:
