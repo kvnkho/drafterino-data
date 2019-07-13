@@ -25,3 +25,5 @@ yarn-error.log*
 # Jupyter notebook artifacts
 *.ipynb
 /ipnyb_checkpoints
+
+*.csv
