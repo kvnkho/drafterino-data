@@ -9,6 +9,19 @@ from datetime import datetime
 from dbconn import connectToDatabase
 from heroes import getHeroes
 
+
+def createHeroCounters(dbconn, matrix_size):
+	# If table doesn't exist, initialize with matrix
+	collection = dbconn['hero_counters']
+	if collection.count_documents({}) == 0:
+		initlized_data = [[0 for _ in range(matrix_size)] for i in range(matrix_size)]
+		collection.insert_one({'values': initlized_data})
+		print("Initialized hero counter table")
+	else:
+		print("Hero counter table already initialized")
+
+	return
+
 def createURL(hero):
 	# Creates and returns the URL to scrape for a hero from Dotabuff
 	base_url = 'https://www.dotabuff.com/heroes/'
@@ -92,18 +105,6 @@ def generateCounterVector(hero, matrix_size, heroes):
 
 	return counter_vector
 
-def createHeroCounters(dbconn, matrix_size):
-	# If table doesn't exist, initialize with matrix
-	collection = dbconn['hero_counters']
-	if collection.count_documents({}) == 0:
-		initlized_data = [[0 for _ in range(matrix_size)] for i in range(matrix_size)]
-		collection.insert_one({'values': initlized_data})
-		print("Initialized hero counter table")
-	else:
-		print("Hero counter table already initialized")
-
-	return
-
 def getHeroCounters(dbconn):
 	# Returns matrix of hero counters
 	collection = dbconn['hero_counters']
@@ -111,7 +112,7 @@ def getHeroCounters(dbconn):
 
 	return hero_counters
 
-def updateHeroCounters(dbconn, hero_id, update_vector):
+def putHeroCounters(dbconn, hero_id, update_vector):
 	collection = dbconn['hero_counters']
 	hero_counters = collection.find_one()['values']
 	hero_counters[hero_id] = update_vector
@@ -119,8 +120,6 @@ def updateHeroCounters(dbconn, hero_id, update_vector):
 	collection.find_one_and_update({},{"$set":{'values' : hero_counters}})
 	return
 
-# Connect to database
-# Get hero list
 
 if __name__ == "__main__":
 
@@ -141,7 +140,7 @@ if __name__ == "__main__":
 
 		if checkUpdateTime(dbconn, hero_id):
 			hero_counters = generateCounterVector(hero, matrix_size, heroes)
-			updateHeroCounters(dbconn, hero_id, hero_counters)
+			putHeroCounters(dbconn, hero_id, hero_counters)
 			time.sleep(10)
 		else:
 			print(hero_name + " has already been scraped recently. Passing.")

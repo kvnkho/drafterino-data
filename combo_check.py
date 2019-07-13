@@ -64,6 +64,7 @@ if __name__ == "__main__":
 
 	limit = 40
 
+	# Check if the viability has been chcked already
 	existing = dbconn['combo_check'].find()
 	existing = [x['heroes'] for x in existing]
 
