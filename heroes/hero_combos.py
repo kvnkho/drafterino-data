@@ -158,6 +158,22 @@ def updateHeroComboMatches(dbconn, hero_ids, ):
 
 	return
 
+def deleteHeroComboMatches(dbconn, patch):
+
+	# This method flushes out old data
+	# patch is a string
+	if patch == '7.22e':
+		time = 1563148800000
+
+	if patch == '7.22d':
+		time = 1561939200000
+
+	collection = dbconn['hero_combos_matches']
+	query = { "start_time": {"$lt": time} }
+	collection.delete_many(query)
+
+	return
+
 if __name__ == "__main__":
 
 	# There are two stopping conditions for the loop
@@ -193,12 +209,13 @@ if __name__ == "__main__":
 
 			if checkUpdateTime(dbconn, [hero_id, hero_id2]): 
 
-				while checkSampleCount(dbonn, [hero_id, hero_id2], 1000):
+				while checkSampleCount(dbonn, [hero_id, hero_id2], 100):
 					# Scrape more matches and insert into DB
 
 					# PULL MATCHES
 					# Write a controller function
-					{'match ID': XXX, 'radiant': XXX, 'win': XXX}
+					# 
+					{'match ID': XXX, 'radiant': XXX, 'win': XXX, 'start_time': XXX}
 					## Write unique matches to combo matches
 
 
