@@ -16,9 +16,12 @@ import time
 
 from pymongo import MongoClient
 
+import sys
+sys.path.append('..')
+
 #User defined modules
 from dbconn import connectToDatabase
-from heroes import getHeroes
+from heroes.heroes import getHeroes
 
 def queryBuilder(hero_id1, hero_id2, limit):
 	query = ('''
