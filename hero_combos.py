@@ -2,7 +2,6 @@
 
 import pandas as pd
 import requests
-import time
 
 # User-defined modules
 
@@ -17,19 +16,7 @@ def createHeroCombos(dbconn, matrix_size):
 	if collection.count_documents({}) == 0:
 		initlized_data = [[0 for _ in range(matrix_size)] for i in range(matrix_size)]
 		collection.insert_one({'values': initlized_data})
-		print("Initialized hero combo table")
-	else:
-		print("Hero combo table already initialized")
-
-	return
-
-def createHeroComboLimits(dbconn, matrix_size):
-	# If table doesn't exist, initialize with matrix
-	collection = dbconn['hero_combos_limits']
-	if collection.count_documents({}) == 0:
-		initlized_data = [[-1 for _ in range(matrix_size)] for i in range(matrix_size)]
-		collection.insert_one({'values': initlized_data})
-		print("Initialized hero combo limit table")
+		print("Initialized hero counter table")
 	else:
 		print("Hero combo table already initialized")
 
@@ -65,9 +52,9 @@ def queryBuilder(hero_id1, hero_id2, radiant, starttime, window, limit):
 			AND second_player.hero_id = '''+ str(hero_id2)
 
 	query = query + '''
-			AND public_matches.start_time <= (extract(epoch from now()) - (86400 * ''' + str(starttime) + "))"
+			AND public_matches.start_time >= (extract(epoch from now()) - (86400 * ''' + str(starttime) + "))"
 	query = query + '''
-			AND public_matches.start_time >= (extract(epoch from now()) - (86400 * ''' + str(starttime + window) +"))"
+			AND public_matches.start_time >= (extract(epoch from now()) - (86400 * ''' + str(starttime - window) +"))"
 	
 	query = query + '''
 			LIMIT ''' + str(limit)
@@ -129,6 +116,13 @@ def writeUpdateTime(dbconn, hero_ids):
 
 	return
 
+def getHeroCombos(dbconn):
+	# Returns matrix of hero counters
+	collection = dbconn['hero_combos']
+	hero_combos = collection.find_one({})['values']
+
+	return hero_combos
+
 def calculateHeroComboRate(dbconn, hero_ids, hero_winrates):
 	# Returns combo synergy rate to write in db
 	collection = dbconn['hero_combos_matches']
@@ -164,57 +158,20 @@ def updateHeroComboMatches(dbconn, hero_ids, ):
 
 	return
 
-#######
-# The ComboLimit methods are related to timeouts using the OpenDota explorer
-# A lower limit makes the queries successful
-
-def calculateComboLimit(hero_id1, hero_id2, limit = 50):
-	time.sleep(1.5)
-	query = queryBuilder(hero_id1, hero_id2, True, 2, 3, limit)
+def checkLimitTimeout(hero_id1, hero_id2, limit = 50):
+	
+	query = queryBuilder(hero_id1, hero_id2, radiant = True, starttime=0, window=1, limit)
 	test = requests.get('https://api.opendota.com/api/explorer', params = {'sql': query}).json()
-
-	if 'error' in test.keys():
-		time.sleep(60)
-		print('Hit rate limit')
-		return calculateComboLimit(hero_id1, hero_id2, limit)
-
-	if not test['err']:
-		print("The call was successful")
+	if test['err'] is not None:
 		return limit
 
 	if limit - 10 == 0:
-		print('Hero id ' + str(hero_id1) + ' and hero id ' + str(hero_id2) + ' does not have enough data')
+		print('Hero id ' + hero_id1 + ' and hero id ' + hero_id2 + ' does not have enough data')
 		return 0
 
-	print("The current limit is " + str(limit))
-	print("Reducing by 10")
+	time.sleep(5)
 
-	return calculateComboLimit(hero_id1, hero_id2, limit - 10)
-
-def getHeroComboLimit(dbconn, hero_id1, hero_id2):
-	collection = dbconn['hero_combos_limits']
-	hero_combo_limits = collection.find_one({})['values']
-
-	return(hero_combo_limits[hero_id1][hero_id2])
-
-def putHeroComboLimit(dbconn, hero_id1, hero_id2, value):
-	collection = dbconn['hero_combos_limits']
-	hero_combo_limits = collection.find_one({})['values']
-	hero_combo_limits[hero_id1][hero_id2] = value
-	hero_combo_limits[hero_id2][hero_id1] = value
-	collection.find_one_and_update({},{"$set":{'values': hero_combo_limits}}, upsert= True)
-
-	return
-
-########
-
-def getHeroCombos(dbconn):
-	# Returns matrix of hero combos
-	collection = dbconn['hero_combos']
-	hero_combos = collection.find_one({})['values']
-
-	return hero_combos
-
+	return checkLimitTimeout(hero_id1, hero_id2, limit - 10)
 
 if __name__ == "__main__":
 
@@ -222,34 +179,18 @@ if __name__ == "__main__":
 	# One is time based. Did I get all the data I could in the last day?
 	# The other is sample. Did I reach 600 samples?
 
-	calculate_limits = True
-
 	# Connect to database and get hero list
+	#lycan = 77
+	#arc = 113
+	#pa = 12
+	checkLimitTimeout(77, 12, 50)
 
-	dbconn = connectToDatabase()
-	heroes = getHeroes(dbconn)
+	# dbconn = connectToDatabase()
+	# heroes = getHeroes(dbconn)
 
 	# # Get maximum matrix size and instantiate if does not exist
-	matrix_size = max([hero['id'] for hero in heroes]) + 1
-	createHeroCombos(dbconn, matrix_size)
-	createHeroComboLimits(dbconn, matrix_size)
-
-	# This loop gets the number of records we can get for each combo at a time
-	# It only needs to be run once to initialize
-	if calculate_limits:
-		for hero in heroes:
-			for hero2 in heroes:
-
-				if hero == hero2:
-					continue
-
-				hero_id = hero['id']
-				hero_id2 = hero2['id']
-
-				print("Working on " + str(hero_id) + " and " + str(hero_id2))
-				if getHeroComboLimit(dbconn, hero_id, hero_id2) == -1:
-					limit = calculateComboLimit(hero_id, hero_id2, 50)
-					putHeroComboLimit(dbconn, hero_id, hero_id2, limit)
+	# matrix_size = max([hero['id'] for hero in heroes]) + 1
+	# createHeroCombos(dbconn, matrix_size)
 
 	# # Gets a pandas dataframe containing hero win rates
 	# win_rates = getHeroWinRates()
